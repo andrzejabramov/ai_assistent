@@ -1,0 +1,66 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - QWEN_API_KEY=${QWEN_API_KEY}
+      - MCP_URL=${MCP_URL}
+      - MCP_TOKEN=${MCP_TOKEN}
+      - TODOIST_API_TOKEN=${TODOIST_API_TOKEN}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+      - ADMIN_LOGIN=${ADMIN_LOGIN}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - USD_TO_RUB_RATE=${USD_TO_RUB_RATE}
+      - DATABASE_URL=${DATABASE_URL}
+    volumes:
+      - ./backend:/app
+      - ./backend/data:/app/data
+    networks:
+      - app_network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Изоляция node_modules хоста от контейнера
+    networks:
+      - app_network
+    command: npm run dev -- --host
+    restart: unless-stopped
+
+  dsh:
+    # Замените на реальный образ DeepSeek Harness, если он отличается
+    build:
+      context: ./dsh
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/workspace/backend
+      - ./frontend:/workspace/frontend
+      - ./dsh/config:/app/config:ro
+      - ./dsh/plugins:/app/plugins:ro
+      - ./dsh/logs:/app/logs
+    networks:
+      - dsh_network # Строго изолированная сеть, нет доступа к app_network
+    # ВАЖНО: Никаких environment переменных с секретами!
+    # ВАЖНО: Никаких privileged или docker.sock!
+    restart: unless-stopped
+
+networks:
+  app_network:
+    driver: bridge
+  dsh_network:
+    driver: bridge
+    internal: true # Дополнительная изоляция: DSH не имеет доступа к интернету (опционально, можно убрать internal: true, если DSH нужен интернет для загрузки пакетов)
